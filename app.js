@@ -23,14 +23,14 @@ app.use("/api/v1", routes);
 
 /* -------------------- 404 HANDLER -------------------- */
 
-app.all("*", (req, res, next) => {
-  next(
-    new AppError(
-      `Route ${req.originalUrl} not found`,
-      404
-    )
-  );
-});
+// app.all("*", (req, res, next) => {
+//   next(
+//     new AppError(
+//       `Route ${req.originalUrl} not found`,
+//       404
+//     )
+//   );
+// });
 
 /* -------------------- GLOBAL ERROR HANDLER -------------------- */
 
