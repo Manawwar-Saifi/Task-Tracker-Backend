@@ -1,6 +1,7 @@
 import express from "express";
 
 const router = express.Router();
+import { razorpayWebhook } from "./modules/payments/webhook.js";
 
 /* -------------------- AUTH -------------------- */
 import authRoutes from "./modules/auth/auth.routes.js";
@@ -39,6 +40,15 @@ router.get("/health", (req, res) => {
     message: "API is running 🚀",
   });
 });
+router.post(
+  "/webhooks/razorpay",
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    }
+  }),
+  razorpayWebhook
+);
 
 /* -------------------- ROUTE REGISTRATION -------------------- */
 router.use("/auth", authRoutes);
