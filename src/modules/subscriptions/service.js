@@ -1,7 +1,8 @@
 import razorpay from "../../config/razorpay.js";
-import Subscription from "./subscription.model.js";
-import Organization from "../organizations/organization.model.js";
+import Subscription from "../billing/subscription.model.js";
+import Organization from "../organizations/model.js";
 import AppError from "../../utils/AppError.js";
+import { SUBSCRIPTION_STATUS } from "../../config/constants.js";
 
 /**
  * Create Razorpay Order

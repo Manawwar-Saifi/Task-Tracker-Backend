@@ -15,10 +15,10 @@ const connectDB = async () => {
     });
 
     logger.info(
-      `🟢 MongoDB Connected: ${conn.connection.host}`
+      `MongoDB Connected: ${conn.connection.host}`
     );
   } catch (error) {
-    logger.error("🔴 MongoDB connection failed", error);
+    logger.error("MongoDB connection failed", error);
     // Throw error so server.js can handle shutdown
     throw error;
   }

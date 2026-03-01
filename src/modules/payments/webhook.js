@@ -1,8 +1,9 @@
 import crypto from "crypto";
-import Subscription from "../subscriptions/model.js";
+import Subscription from "../billing/subscription.model.js";
 import Organization from "../organizations/model.js";
 import User from "../users/model.js";
 import AppError from "../../utils/AppError.js";
+import { SUBSCRIPTION_STATUS } from "../../config/constants.js";
 
 /**
  * Razorpay Webhook Handler
@@ -26,13 +27,13 @@ export const razorpayWebhook = async (req, res) => {
   const event = req.body.event;
   const payload = req.body.payload;
 
-  // ✅ PAYMENT SUCCESS
+  // PAYMENT SUCCESS
   if (event === "payment.captured") {
     const payment = payload.payment.entity;
 
+    // Find subscription by razorpay subscription ID or order reference
     const subscription = await Subscription.findOne({
-      paymentOrderId: payment.order_id,
-      status: "pending",
+      razorpaySubscriptionId: payment.subscription_id || payment.order_id,
     });
 
     if (!subscription) {
@@ -40,13 +41,12 @@ export const razorpayWebhook = async (req, res) => {
     }
 
     // Activate subscription
-    subscription.status = "active";
-    subscription.startDate = new Date();
-    subscription.endDate = new Date(
-      Date.now() + 30 * 24 * 60 * 60 * 1000
-    );
-    subscription.paymentTransactionId = payment.id;
-    subscription.paymentSignature = signature;
+    const now = new Date();
+    subscription.status = SUBSCRIPTION_STATUS.ACTIVE;
+    subscription.currentPeriod = {
+      start: now,
+      end: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), // 30 days
+    };
 
     await subscription.save();
 
