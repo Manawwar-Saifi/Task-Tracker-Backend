@@ -15,6 +15,11 @@ import logger from "./src/utils/logger.js";
 
 const app = express();
 
+/* -------------------- PROXY TRUST (for Vercel/serverless) -------------------- */
+
+// Trust first proxy (Vercel, AWS, etc.) for correct IP detection
+app.set("trust proxy", 1);
+
 /* -------------------- SECURITY MIDDLEWARES -------------------- */
 
 // Set security HTTP headers
