@@ -1,4 +1,5 @@
 import AppError from "../utils/AppError.js";
+import logger from "../utils/logger.js";
 
 /**
  * Permission Middleware (RBAC)
@@ -14,18 +15,36 @@ const permissionMiddleware = (requiredPermission, options = {}) => {
   return (req, res, next) => {
     const user = req.user;
 
+    // Debug logging with console.log for visibility
+    console.log(`\n[PERMISSION] ===== CHECK =====`);
+    console.log(`[PERMISSION] Route: ${req.method} ${req.path}`);
+    console.log(`[PERMISSION] Required: ${JSON.stringify(requiredPermission)}`);
+    console.log(`[PERMISSION] User: ${user?.email || 'none'}`);
+    console.log(`[PERMISSION] isOwner: ${user?.isOwner} (type: ${typeof user?.isOwner})`);
+    console.log(`[PERMISSION] isSuperAdmin: ${user?.isSuperAdmin}`);
+    console.log(`[PERMISSION] roleLevel: ${user?.roleLevel}`);
+
     // Check if user context exists
     if (!user) {
+      console.log(`[PERMISSION] ❌ DENIED - No user context\n`);
       return next(new AppError("Authentication required", 401));
     }
 
     // 1️⃣ Super Admin bypass - has all permissions
-    if (user.isSuperAdmin) {
+    if (user.isSuperAdmin === true) {
+      console.log(`[PERMISSION] ✅ ALLOWED - Super Admin bypass\n`);
       return next();
     }
 
     // 2️⃣ Owner bypass for most operations (except super admin actions)
-    if (user.isOwner) {
+    if (user.isOwner === true) {
+      console.log(`[PERMISSION] ✅ ALLOWED - Owner bypass\n`);
+      return next();
+    }
+
+    // 3️⃣ CEO role bypass (level 1) - has all permissions
+    if (user.roleLevel === 1) {
+      console.log(`[PERMISSION] ✅ ALLOWED - CEO role bypass (level 1)\n`);
       return next();
     }
 
@@ -35,7 +54,7 @@ const permissionMiddleware = (requiredPermission, options = {}) => {
       ...(user.directPermissions || []),
     ]);
 
-    // 3️⃣ Check permissions
+    // 4️⃣ Check permissions
     const requiredPerms = Array.isArray(requiredPermission)
       ? requiredPermission
       : [requiredPermission];
@@ -55,11 +74,14 @@ const permissionMiddleware = (requiredPermission, options = {}) => {
     }
 
     if (!hasPermission) {
+      console.log(`[PERMISSION] ❌ DENIED - Missing permissions`);
+      console.log(`[PERMISSION] User has ${userPermissions.size} permissions\n`);
       return next(
         new AppError("You do not have permission to perform this action", 403)
       );
     }
 
+    console.log(`[PERMISSION] ✅ ALLOWED - Has required permission\n`);
     next();
   };
 };
@@ -83,8 +105,8 @@ export const hierarchyMiddleware = (options = {}) => {
       return next(new AppError("Authentication required", 401));
     }
 
-    // Super admin or owner can access anyone
-    if (user.isSuperAdmin || user.isOwner) {
+    // Super admin, owner, or CEO can access anyone
+    if (user.isSuperAdmin || user.isOwner || user.roleLevel === 1) {
       return next();
     }
 

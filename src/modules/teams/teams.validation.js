@@ -4,6 +4,9 @@ const objectIdSchema = z
   .string()
   .regex(/^[0-9a-fA-F]{24}$/, "Invalid ID format");
 
+// Transform empty string to null
+const emptyToNull = (val) => (val === "" ? null : val);
+
 /**
  * Create team schema
  */
@@ -20,8 +23,13 @@ export const createTeamSchema = z.object({
       .trim()
       .optional()
       .default(""),
-    leaderId: objectIdSchema.optional().nullable(),
-    parentTeamId: objectIdSchema.optional().nullable(),
+    leaderId: objectIdSchema.refine((val) => val && val.length > 0, {
+      message: "Team leader is required",
+    }),
+    parentTeamId: z.preprocess(
+      emptyToNull,
+      objectIdSchema.optional().nullable()
+    ),
     settings: z
       .object({
         taskVisibility: z.enum(["private", "team", "all"]).optional(),

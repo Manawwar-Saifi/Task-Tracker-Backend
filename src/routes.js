@@ -16,7 +16,7 @@ import userRoutes from "./modules/users/routes.js";
 // import membershipRoutes from "./modules/memberships/organization-memberships.routes.js";
 
 /* -------------------- ROLES & PERMISSIONS -------------------- */
-// import roleRoutes from "./modules/roles/role.routes.js";
+import roleRoutes from "./modules/roles/roles.routes.js";
 // import permissionRoutes from "./modules/permissions/permission.routes.js";
 
 /* -------------------- CORE FEATURES -------------------- */
@@ -44,7 +44,7 @@ import notificationRoutes from "./modules/notifications/notifications.routes.js"
 import reportRoutes from "./modules/reports/report.routes.js";
 
 /* -------------------- BILLING & SUBSCRIPTION -------------------- */
-// import billingRoutes from "./modules/billing/billing.routes.js";
+import billingRoutes from "./modules/billing/billing.routes.js";
 // import paymentRoutes from "./modules/payments/payment.routes.js";
 import subscriptionRoutes from "./modules/subscriptions/subscription.routes.js";
 
@@ -70,7 +70,7 @@ router.use("/auth", authRoutes);
 router.use("/users", userRoutes);
 // router.use("/organizations", organizationRoutes);
 // router.use("/memberships", membershipRoutes);
-// router.use("/roles", roleRoutes);
+router.use("/roles", roleRoutes);
 // router.use("/permissions", permissionRoutes);
 router.use("/teams", teamRoutes);
 router.use("/tasks", taskRoutes);
@@ -82,7 +82,7 @@ router.use("/hr", hrRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/reports", reportRoutes);
 // router.use("/approvals", approvalRoutes);
-// router.use("/billing", billingRoutes);
+router.use("/billing", billingRoutes);
 // router.use("/payments", paymentRoutes);
 router.use("/subscriptions", subscriptionRoutes);
 

@@ -1,7 +1,11 @@
 // src/config/db.js
 
 import mongoose from "mongoose";
+import dns from "dns";
 import logger from "../utils/logger.js";
+
+// Use Google DNS for SRV record resolution (fixes router DNS issues with MongoDB Atlas)
+dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
 /**
  * Connect to MongoDB

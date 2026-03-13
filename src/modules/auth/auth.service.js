@@ -3,10 +3,12 @@ import crypto from "crypto";
 import User from "../users/model.js";
 import Organization from "../organizations/model.js";
 import Role from "../roles/roles.model.js";
+import EmailVerification from "./emailVerification.model.js";
 import "../teams/teams.model.js"; // Register Team model for populate
 import { seedOrganizationRoles } from "../../seeders/permissionSeeder.js";
 import AppError from "../../utils/AppError.js";
 import logger from "../../utils/logger.js";
+import { sendOtpEmail } from "../../services/email.service.js";
 import {
   createTrialSubscription,
   getSubscriptionStatus,
@@ -84,10 +86,156 @@ export const verifyRefreshToken = (token) => {
   }
 };
 
+// ============ OTP FUNCTIONS ============
+
+/**
+ * Generate 6-digit numeric OTP
+ */
+const generateOtp = () => {
+  // Cryptographically secure random 6-digit number
+  return crypto.randomInt(100000, 999999).toString();
+};
+
+/**
+ * Hash OTP for storage (SHA256)
+ */
+const hashOtp = (otp) => {
+  return crypto.createHash("sha256").update(otp).digest("hex");
+};
+
+/**
+ * Generate verification token after OTP is verified
+ */
+const generateVerificationToken = (email) => {
+  return jwt.sign(
+    { email: email.toLowerCase(), purpose: "email_verification" },
+    JWT_ACCESS_SECRET,
+    { expiresIn: "30m" }
+  );
+};
+
+/**
+ * Send OTP to email for verification
+ */
+export const sendOtp = async (email, ip) => {
+  const normalizedEmail = email.toLowerCase();
+
+  // Check if email already registered
+  const existingUser = await User.findOne({
+    email: normalizedEmail,
+    isDeleted: false,
+  });
+  if (existingUser) {
+    throw new AppError("Email already registered", 409);
+  }
+
+  // Check existing verification record for rate limiting
+  let verification = await EmailVerification.findOne({ email: normalizedEmail });
+
+  if (verification) {
+    // Rate limit: max 3 resends per 15 minutes
+    const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
+    if (verification.resendCount >= 3 && verification.lastResendAt > fifteenMinsAgo) {
+      throw new AppError("Too many OTP requests. Please try again later.", 429);
+    }
+  }
+
+  // Generate and hash OTP
+  const otp = generateOtp();
+  const otpHash = hashOtp(otp);
+
+  // Upsert verification record
+  await EmailVerification.findOneAndUpdate(
+    { email: normalizedEmail },
+    {
+      email: normalizedEmail,
+      otpHash,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      attempts: 0,
+      $inc: { resendCount: verification ? 1 : 0 },
+      lastResendAt: new Date(),
+      requestIp: ip,
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  // Send OTP email
+  try {
+    await sendOtpEmail(normalizedEmail, otp);
+    logger.info(`OTP sent to: ${normalizedEmail}`);
+  } catch (emailError) {
+    // Delete the verification record if email fails
+    await EmailVerification.deleteOne({ email: normalizedEmail });
+    logger.error(`Failed to send OTP email: ${emailError.message}`);
+    throw new AppError(
+      emailError.message || "Failed to send verification email. Please try again.",
+      500
+    );
+  }
+
+  return { message: "OTP sent to email" };
+};
+
+/**
+ * Verify OTP and return verification token
+ */
+export const verifyOtp = async (email, otp) => {
+  const normalizedEmail = email.toLowerCase();
+
+  const verification = await EmailVerification.findOne({
+    email: normalizedEmail,
+    expiresAt: { $gt: new Date() },
+  });
+
+  if (!verification) {
+    throw new AppError("OTP expired or not found. Please request a new one.", 400);
+  }
+
+  // Check max attempts
+  if (verification.attempts >= 5) {
+    throw new AppError("Too many failed attempts. Please request a new OTP.", 429);
+  }
+
+  // Verify OTP hash
+  const otpHash = hashOtp(otp);
+  if (verification.otpHash !== otpHash) {
+    verification.attempts += 1;
+    await verification.save();
+    const remaining = 5 - verification.attempts;
+    throw new AppError(
+      `Invalid OTP. ${remaining} attempt${remaining !== 1 ? "s" : ""} remaining.`,
+      400
+    );
+  }
+
+  // Delete verification record (one-time use)
+  await EmailVerification.deleteOne({ _id: verification._id });
+
+  // Generate verification token
+  const verificationToken = generateVerificationToken(normalizedEmail);
+
+  logger.info(`Email verified: ${normalizedEmail}`);
+
+  return {
+    message: "Email verified successfully",
+    verificationToken,
+  };
+};
+
+/**
+ * Resend OTP (alias for sendOtp with additional checks)
+ */
+export const resendOtp = async (email, ip) => {
+  return sendOtp(email, ip);
+};
+
+// ============ REGISTRATION ============
+
 /**
  * Register new organization with CEO
  */
 export const registerOrganization = async ({
+  verificationToken,
   organizationName,
   firstName,
   lastName,
@@ -95,6 +243,23 @@ export const registerOrganization = async ({
   password,
   phone,
 }) => {
+  // Verify email verification token
+  if (verificationToken) {
+    try {
+      const decoded = jwt.verify(verificationToken, JWT_ACCESS_SECRET);
+      if (
+        decoded.purpose !== "email_verification" ||
+        decoded.email !== email.toLowerCase()
+      ) {
+        throw new Error("Invalid token");
+      }
+    } catch (error) {
+      throw new AppError(
+        "Invalid or expired verification. Please verify your email again.",
+        400
+      );
+    }
+  }
   // Check if organization with same name and owner email exists
   const existingOrg = await Organization.findOne({
     ownerEmail: email.toLowerCase(),
@@ -126,7 +291,7 @@ export const registerOrganization = async ({
   }
 
   // Create CEO user
-  const user = await User.create({
+  let user = await User.create({
     firstName,
     lastName,
     email: email.toLowerCase(),
@@ -138,6 +303,9 @@ export const registerOrganization = async ({
     isOwner: true,
     dateOfJoining: new Date(),
   });
+
+  // Populate role for response
+  user = await User.findById(user._id).populate("roleId", "name slug level");
 
   // Update organization with owner user ID
   organization.ownerUserId = user._id;
@@ -177,12 +345,14 @@ export const registerOrganization = async ({
  * Login user
  */
 export const loginUser = async ({ email, password, organizationId }) => {
-  // Find user with password
+  // Find user with password and populate role
   const user = await User.findOne({
     email: email.toLowerCase(),
     ...(organizationId && { organizationId }),
     isDeleted: false,
-  }).select("+password +refreshToken");
+  })
+    .select("+password +refreshToken")
+    .populate("roleId", "name slug level");
 
   if (!user) {
     throw new AppError("Invalid email or password", 401);
@@ -202,6 +372,21 @@ export const loginUser = async ({ email, password, organizationId }) => {
     throw new AppError("Invalid email or password", 401);
   }
 
+  // Get organization
+  const organization = await Organization.findById(user.organizationId);
+
+  // Auto-fix: Set isOwner if user is organization owner but flag is missing
+  if (organization && !user.isOwner) {
+    const isOrgOwner =
+      organization.ownerEmail?.toLowerCase() === user.email.toLowerCase() ||
+      organization.ownerUserId?.toString() === user._id.toString();
+
+    if (isOrgOwner) {
+      user.isOwner = true;
+      logger.info(`Auto-fixed isOwner flag for: ${user.email}`);
+    }
+  }
+
   // Generate tokens
   const { accessToken, refreshToken } = generateTokens(user);
 
@@ -211,9 +396,6 @@ export const loginUser = async ({ email, password, organizationId }) => {
   user.lastLoginAt = new Date();
   user.loginCount = (user.loginCount || 0) + 1;
   await user.save({ validateBeforeSave: false });
-
-  // Get organization
-  const organization = await Organization.findById(user.organizationId);
 
   // Get subscription status
   const subscriptionStatus = organization
@@ -379,7 +561,7 @@ export const resetPassword = async (resetToken, newPassword) => {
 export const inviteUser = async (
   organizationId,
   invitedBy,
-  { firstName, lastName, email, roleId, teamIds, reportingTo }
+  { firstName, lastName, email, roleId, teamIds, reportingTo, department, designation }
 ) => {
   // Check subscription user limit
   const limitCheck = await checkUserLimit(organizationId);
@@ -427,6 +609,8 @@ export const inviteUser = async (
     roleId: roleId || null,
     teamIds: teamIds || [],
     reportingTo: reportingTo || null,
+    department: department || null,
+    designation: designation || null,
     status: "invited",
     inviteToken: hashedToken,
     inviteTokenExpiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
@@ -546,6 +730,10 @@ const sanitizeUser = (user) => {
   delete userObj.passwordResetToken;
   delete userObj.passwordResetExpiry;
 
+  // Add helper fields for frontend
+  userObj.roleName = userObj.roleId?.name || (userObj.isOwner ? "CEO" : null);
+  userObj.roleLevel = userObj.roleId?.level || (userObj.isOwner ? 1 : 999);
+
   return userObj;
 };
 
@@ -555,6 +743,9 @@ export default {
   generateTokens,
   verifyAccessToken,
   verifyRefreshToken,
+  sendOtp,
+  verifyOtp,
+  resendOtp,
   registerOrganization,
   loginUser,
   logoutUser,

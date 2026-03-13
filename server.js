@@ -1,8 +1,10 @@
+import dns from "node:dns/promises";
+dns.setServers(["0.0.0.0","1.1.1.1","8.8.8.8","1.0.0.0"]);
+
 // Load environment variables FIRST (before any other imports)
 import dotenv from "dotenv";
 dotenv.config();
-import dns from "node:dns/promises";
-dns.setServers(["1.1.1.1"]);
+
 // Now import modules that depend on env vars
 import app from "./app.js";
 import connectDB from "./src/config/db.js";

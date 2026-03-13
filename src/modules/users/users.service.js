@@ -109,7 +109,12 @@ export const createUser = async (organizationId, createdBy, data) => {
 export const getUsers = async (organizationId, options = {}) => {
   const { page = 1, limit = 20, search, status, roleId, teamId } = options;
 
-  const query = { organizationId, isDeleted: false };
+  const query = {
+    organizationId,
+    isDeleted: false,
+    // Exclude Super Admins from user list - they should not be visible to anyone
+    isSuperAdmin: { $ne: true },
+  };
 
   // Apply filters
   if (search) {
@@ -131,6 +136,7 @@ export const getUsers = async (organizationId, options = {}) => {
     User.find(query)
       .populate("roleId", "name slug level")
       .populate("teamIds", "name")
+      .populate("organizationId", "name") // Populate organization name
       .select("-password -refreshToken -inviteToken -passwordResetToken")
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -139,8 +145,16 @@ export const getUsers = async (organizationId, options = {}) => {
     User.countDocuments(query),
   ]);
 
+  // Add helper fields for frontend
+  const usersWithHelpers = users.map((user) => ({
+    ...user,
+    roleName: user.roleId?.name || null,
+    roleLevel: user.roleId?.level || 999,
+    organizationName: user.organizationId?.name || null, // Add organization name as direct field
+  }));
+
   return {
-    users,
+    users: usersWithHelpers,
     pagination: {
       page,
       limit,
@@ -362,6 +376,7 @@ export const getAvailableUsersForTeam = async (organizationId, teamId) => {
     isDeleted: false,
     status: "active",
     _id: { $nin: memberIds },
+    isSuperAdmin: { $ne: true }, // Exclude Super Admins
   })
     .select("firstName lastName email designation")
     .sort({ firstName: 1 })

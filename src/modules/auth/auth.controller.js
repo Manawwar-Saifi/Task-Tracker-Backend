@@ -5,9 +5,56 @@ import * as authService from "./auth.service.js";
 const REFRESH_TOKEN_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "strict",
+  sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 };
+
+// ============ OTP CONTROLLERS ============
+
+/**
+ * @desc    Send OTP to email
+ * @route   POST /api/v1/auth/send-otp
+ * @access  Public
+ */
+export const sendOtp = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const ip = req.ip || req.connection?.remoteAddress;
+
+  const data = await authService.sendOtp(email, ip);
+
+  return successResponse(res, 200, data.message);
+});
+
+/**
+ * @desc    Verify OTP
+ * @route   POST /api/v1/auth/verify-otp
+ * @access  Public
+ */
+export const verifyOtp = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  const data = await authService.verifyOtp(email, otp);
+
+  return successResponse(res, 200, data.message, {
+    verificationToken: data.verificationToken,
+  });
+});
+
+/**
+ * @desc    Resend OTP
+ * @route   POST /api/v1/auth/resend-otp
+ * @access  Public
+ */
+export const resendOtp = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const ip = req.ip || req.connection?.remoteAddress;
+
+  const data = await authService.resendOtp(email, ip);
+
+  return successResponse(res, 200, data.message);
+});
+
+// ============ REGISTRATION ============
 
 /**
  * @desc    Register new organization with CEO
@@ -15,10 +62,11 @@ const REFRESH_TOKEN_COOKIE_OPTIONS = {
  * @access  Public
  */
 export const register = asyncHandler(async (req, res) => {
-  const { organizationName, firstName, lastName, email, password, phone } =
+  const { verificationToken, organizationName, firstName, lastName, email, password, phone } =
     req.body;
 
   const data = await authService.registerOrganization({
+    verificationToken,
     organizationName,
     firstName,
     lastName,
@@ -33,6 +81,7 @@ export const register = asyncHandler(async (req, res) => {
   return successResponse(res, 201, "Organization registered successfully", {
     user: data.user,
     organization: data.organization,
+    subscription: data.subscription,
     accessToken: data.accessToken,
   });
 });
@@ -154,7 +203,7 @@ export const resetPassword = asyncHandler(async (req, res) => {
  * @access  Private (requires USER_INVITE permission)
  */
 export const inviteUser = asyncHandler(async (req, res) => {
-  const { firstName, lastName, email, roleId, teamIds, reportingTo } =
+  const { firstName, lastName, email, roleId, teamIds, reportingTo, department, designation } =
     req.body;
 
   const data = await authService.inviteUser(
@@ -167,6 +216,8 @@ export const inviteUser = asyncHandler(async (req, res) => {
       roleId,
       teamIds,
       reportingTo,
+      department,
+      designation,
     }
   );
 
@@ -226,6 +277,9 @@ export const verifyToken = asyncHandler(async (req, res) => {
 });
 
 export default {
+  sendOtp,
+  verifyOtp,
+  resendOtp,
   register,
   login,
   logout,

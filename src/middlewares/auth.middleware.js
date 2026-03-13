@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import AppError from "../utils/AppError.js";
 import User from "../modules/users/model.js";
+import Organization from "../modules/organizations/model.js";
 
 /**
  * Authentication Middleware
@@ -61,7 +62,38 @@ const authMiddleware = async (req, res, next) => {
       );
     }
 
-    // 6️⃣ Attach user context to request
+    // 6️⃣ Check if user is organization owner (auto-detect)
+    let isOwner = user.isOwner || false;
+    let isSuperAdmin = user.isSuperAdmin || false;
+
+    if (!isOwner && user.organizationId) {
+      const org = await Organization.findById(user.organizationId).select("ownerUserId ownerEmail").lean();
+      if (org) {
+        isOwner =
+          org.ownerUserId?.toString() === user._id.toString() ||
+          org.ownerEmail?.toLowerCase() === user.email.toLowerCase();
+
+        // Auto-fix: Save isOwner flag if detected
+        if (isOwner && !user.isOwner) {
+          await User.findByIdAndUpdate(user._id, { isOwner: true });
+          console.log(`[AUTH] Auto-fixed isOwner for: ${user.email}`);
+        }
+      }
+    }
+
+    // Get role level (1 = CEO/highest)
+    const roleLevel = user.roleId?.level || 999;
+
+    // DEBUG: Log user context
+    console.log(`\n[AUTH] ===== USER CONTEXT =====`);
+    console.log(`[AUTH] Email: ${user.email}`);
+    console.log(`[AUTH] isOwner: ${isOwner} (DB: ${user.isOwner})`);
+    console.log(`[AUTH] isSuperAdmin: ${isSuperAdmin}`);
+    console.log(`[AUTH] roleLevel: ${roleLevel} (${user.roleId?.name || 'no role'})`);
+    console.log(`[AUTH] orgId: ${user.organizationId}`);
+    console.log(`[AUTH] ==============================\n`);
+
+    // 7️⃣ Attach user context to request
     req.user = {
       userId: user._id,
       email: user.email,
@@ -70,11 +102,11 @@ const authMiddleware = async (req, res, next) => {
       organizationId: user.organizationId,
       roleId: user.roleId?._id || null,
       roleName: user.roleId?.name || null,
-      roleLevel: user.roleId?.level || 999,
+      roleLevel: roleLevel,
       permissions: user.roleId?.permissionCodes || [],
       directPermissions: user.permissions || [],
-      isSuperAdmin: user.isSuperAdmin || false,
-      isOwner: user.isOwner || false,
+      isSuperAdmin: isSuperAdmin,
+      isOwner: isOwner,
     };
 
     // Shortcut for organization ID

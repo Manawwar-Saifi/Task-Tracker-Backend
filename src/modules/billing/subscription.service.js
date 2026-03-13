@@ -67,27 +67,75 @@ export const getSubscriptionWithPlan = async (organizationId) => {
  * @returns {Promise<Object>} { canAdd: boolean, current: number, limit: number, message?: string }
  */
 export const checkUserLimit = async (organizationId) => {
+  console.log(`\n[USER LIMIT] Checking for org: ${organizationId}`);
+
   const subscription = await getSubscriptionWithPlan(organizationId);
 
   if (!subscription) {
-    return {
-      canAdd: false,
-      current: 0,
-      limit: 0,
-      message: "No subscription found",
-    };
+    console.log(`[USER LIMIT] ⚠️ No subscription found for org: ${organizationId}`);
+    // Free tier: limit to 5 users
+    const FREE_USER_LIMIT = 5;
+    const User = (await import("../users/model.js")).default;
+    const currentUsers = await User.countDocuments({
+      organizationId,
+      isDeleted: false,
+      status: { $ne: 'invited' } // Don't count pending invites
+    });
+
+    if (currentUsers >= FREE_USER_LIMIT) {
+      console.log(`[USER LIMIT] ❌ Free tier limit reached: ${currentUsers}/${FREE_USER_LIMIT}`);
+      return {
+        canAdd: false,
+        current: currentUsers,
+        limit: FREE_USER_LIMIT,
+        message: `Free tier user limit reached (${currentUsers}/${FREE_USER_LIMIT}). Subscribe to add more users.`,
+      };
+    }
+
+    console.log(`[USER LIMIT] ✅ Free tier: ${currentUsers}/${FREE_USER_LIMIT} users`);
+    return { canAdd: true, current: currentUsers, limit: FREE_USER_LIMIT };
   }
 
   const plan = subscription.planId;
-  const currentUsers = subscription.usage.currentUsers;
-  const maxUsers = plan.limits.maxUsers;
+
+  if (!plan) {
+    console.log(`[USER LIMIT] ⚠️ Subscription exists but no plan linked`);
+    // Free tier: limit to 5 users
+    const FREE_USER_LIMIT = 5;
+    const User = (await import("../users/model.js")).default;
+    const currentUsers = await User.countDocuments({
+      organizationId,
+      isDeleted: false,
+      status: { $ne: 'invited' }
+    });
+
+    if (currentUsers >= FREE_USER_LIMIT) {
+      console.log(`[USER LIMIT] ❌ Free tier limit reached: ${currentUsers}/${FREE_USER_LIMIT}`);
+      return {
+        canAdd: false,
+        current: currentUsers,
+        limit: FREE_USER_LIMIT,
+        message: `Free tier user limit reached (${currentUsers}/${FREE_USER_LIMIT}). Subscribe to add more users.`,
+      };
+    }
+
+    console.log(`[USER LIMIT] ✅ Free tier: ${currentUsers}/${FREE_USER_LIMIT} users`);
+    return { canAdd: true, current: currentUsers, limit: FREE_USER_LIMIT };
+  }
+
+  const currentUsers = subscription.usage?.currentUsers || 0;
+  const maxUsers = plan.limits?.maxUsers || 5;
+
+  console.log(`[USER LIMIT] Plan: ${plan.name}, Current: ${currentUsers}, Max: ${maxUsers}`);
 
   // -1 means unlimited
   if (maxUsers === -1) {
+    console.log(`[USER LIMIT] ✅ Unlimited users allowed`);
     return { canAdd: true, current: currentUsers, limit: -1 };
   }
 
   if (currentUsers >= maxUsers) {
+    console.log(`[USER LIMIT] ❌ Limit reached: ${currentUsers}/${maxUsers}`);
     return {
       canAdd: false,
       current: currentUsers,
@@ -96,6 +144,7 @@ export const checkUserLimit = async (organizationId) => {
     };
   }
 
+  console.log(`[USER LIMIT] ✅ Can add user: ${currentUsers}/${maxUsers}`);
   return { canAdd: true, current: currentUsers, limit: maxUsers };
 };
 
@@ -105,27 +154,67 @@ export const checkUserLimit = async (organizationId) => {
  * @returns {Promise<Object>} { canAdd: boolean, current: number, limit: number, message?: string }
  */
 export const checkTeamLimit = async (organizationId) => {
+  console.log(`\n[TEAM LIMIT] Checking for org: ${organizationId}`);
+
   const subscription = await getSubscriptionWithPlan(organizationId);
 
   if (!subscription) {
-    return {
-      canAdd: false,
-      current: 0,
-      limit: 0,
-      message: "No subscription found",
-    };
+    console.log(`[TEAM LIMIT] ⚠️ No subscription found for org: ${organizationId}`);
+    // Free tier: limit to 5 teams
+    const FREE_TEAM_LIMIT = 5;
+    const Team = (await import("../teams/teams.model.js")).default;
+    const currentTeams = await Team.countDocuments({ organizationId, isDeleted: false });
+
+    if (currentTeams >= FREE_TEAM_LIMIT) {
+      console.log(`[TEAM LIMIT] ❌ Free tier limit reached: ${currentTeams}/${FREE_TEAM_LIMIT}`);
+      return {
+        canAdd: false,
+        current: currentTeams,
+        limit: FREE_TEAM_LIMIT,
+        message: `Free tier team limit reached (${currentTeams}/${FREE_TEAM_LIMIT}). Subscribe to add more teams.`,
+      };
+    }
+
+    console.log(`[TEAM LIMIT] ✅ Free tier: ${currentTeams}/${FREE_TEAM_LIMIT} teams`);
+    return { canAdd: true, current: currentTeams, limit: FREE_TEAM_LIMIT };
   }
 
   const plan = subscription.planId;
-  const currentTeams = subscription.usage.currentTeams;
-  const maxTeams = plan.limits.maxTeams;
+
+  if (!plan) {
+    console.log(`[TEAM LIMIT] ⚠️ Subscription exists but no plan linked`);
+    // Free tier: limit to 5 teams
+    const FREE_TEAM_LIMIT = 5;
+    const Team = (await import("../teams/teams.model.js")).default;
+    const currentTeams = await Team.countDocuments({ organizationId, isDeleted: false });
+
+    if (currentTeams >= FREE_TEAM_LIMIT) {
+      console.log(`[TEAM LIMIT] ❌ Free tier limit reached: ${currentTeams}/${FREE_TEAM_LIMIT}`);
+      return {
+        canAdd: false,
+        current: currentTeams,
+        limit: FREE_TEAM_LIMIT,
+        message: `Free tier team limit reached (${currentTeams}/${FREE_TEAM_LIMIT}). Subscribe to add more teams.`,
+      };
+    }
+
+    console.log(`[TEAM LIMIT] ✅ Free tier: ${currentTeams}/${FREE_TEAM_LIMIT} teams`);
+    return { canAdd: true, current: currentTeams, limit: FREE_TEAM_LIMIT };
+  }
+
+  const currentTeams = subscription.usage?.currentTeams || 0;
+  const maxTeams = plan.limits?.maxTeams || 3;
+
+  console.log(`[TEAM LIMIT] Plan: ${plan.name}, Current: ${currentTeams}, Max: ${maxTeams}`);
 
   // -1 means unlimited
   if (maxTeams === -1) {
+    console.log(`[TEAM LIMIT] ✅ Unlimited teams allowed`);
     return { canAdd: true, current: currentTeams, limit: -1 };
   }
 
   if (currentTeams >= maxTeams) {
+    console.log(`[TEAM LIMIT] ❌ Limit reached: ${currentTeams}/${maxTeams}`);
     return {
       canAdd: false,
       current: currentTeams,
@@ -134,6 +223,7 @@ export const checkTeamLimit = async (organizationId) => {
     };
   }
 
+  console.log(`[TEAM LIMIT] ✅ Can add team: ${currentTeams}/${maxTeams}`);
   return { canAdd: true, current: currentTeams, limit: maxTeams };
 };
 

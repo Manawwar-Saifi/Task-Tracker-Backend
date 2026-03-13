@@ -45,8 +45,8 @@ export const getTeams = async (organizationId, options = {}) => {
 
   const [teams, total] = await Promise.all([
     Team.find(query)
-      .populate("leaderId", "firstName lastName email designation")
-      .populate("members.userId", "firstName lastName email designation")
+      .populate("leaderId", "firstName lastName email designation isSuperAdmin")
+      .populate("members.userId", "firstName lastName email designation isSuperAdmin")
       .populate("parentTeamId", "name")
       .sort({ name: 1 })
       .skip(skip)
@@ -77,8 +77,8 @@ export const getTeam = async (teamId, organizationId) => {
     organizationId,
     isDeleted: false,
   })
-    .populate("leaderId", "firstName lastName email designation")
-    .populate("members.userId", "firstName lastName email designation roleId")
+    .populate("leaderId", "firstName lastName email designation isSuperAdmin")
+    .populate("members.userId", "firstName lastName email designation roleId isSuperAdmin")
     .populate("parentTeamId", "name")
     .populate("createdBy", "firstName lastName")
     .lean();
@@ -559,14 +559,24 @@ export const getUserTeams = async (targetUserId, organizationId) => {
 
 /**
  * Format team response
+ * Filters out Super Admins from team members - they should not be visible
  */
 const formatTeamResponse = (team) => {
+  // Filter out Super Admins from members
+  const filteredMembers = team.members?.filter((m) => {
+    // Exclude Super Admins from members list
+    return m.userId && !m.userId.isSuperAdmin;
+  }) || [];
+
+  // Check if leader is a Super Admin (shouldn't be shown)
+  const leaderIsVisible = team.leaderId && !team.leaderId.isSuperAdmin;
+
   return {
     id: team._id,
     name: team.name,
     slug: team.slug,
     description: team.description,
-    leader: team.leaderId
+    leader: leaderIsVisible
       ? {
           id: team.leaderId._id || team.leaderId,
           firstName: team.leaderId.firstName,
@@ -575,16 +585,15 @@ const formatTeamResponse = (team) => {
           designation: team.leaderId.designation,
         }
       : null,
-    members:
-      team.members?.map((m) => ({
-        userId: m.userId?._id || m.userId,
-        firstName: m.userId?.firstName,
-        lastName: m.userId?.lastName,
-        email: m.userId?.email,
-        designation: m.userId?.designation,
-        joinedAt: m.joinedAt,
-      })) || [],
-    memberCount: team.memberCount || team.members?.length || 0,
+    members: filteredMembers.map((m) => ({
+      userId: m.userId?._id || m.userId,
+      firstName: m.userId?.firstName,
+      lastName: m.userId?.lastName,
+      email: m.userId?.email,
+      designation: m.userId?.designation,
+      joinedAt: m.joinedAt,
+    })),
+    memberCount: filteredMembers.length,
     parentTeam: team.parentTeamId
       ? {
           id: team.parentTeamId._id || team.parentTeamId,

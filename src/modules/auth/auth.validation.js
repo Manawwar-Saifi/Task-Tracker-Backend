@@ -30,11 +30,37 @@ const objectIdSchema = z
   .regex(/^[0-9a-fA-F]{24}$/, "Invalid ID format")
   .optional();
 
+// OTP validation
+const otpSchema = z
+  .string()
+  .length(6, "OTP must be 6 digits")
+  .regex(/^\d{6}$/, "OTP must contain only numbers");
+
+/**
+ * Send OTP schema
+ */
+export const sendOtpSchema = z.object({
+  body: z.object({
+    email: emailSchema,
+  }),
+});
+
+/**
+ * Verify OTP schema
+ */
+export const verifyOtpSchema = z.object({
+  body: z.object({
+    email: emailSchema,
+    otp: otpSchema,
+  }),
+});
+
 /**
  * Register organization schema
  */
 export const registerSchema = z.object({
   body: z.object({
+    verificationToken: z.string().min(1, "Verification token is required").optional(),
     organizationName: z
       .string()
       .min(2, "Organization name must be at least 2 characters")
@@ -103,6 +129,8 @@ export const inviteUserSchema = z.object({
     roleId: objectIdSchema,
     teamIds: z.array(z.string().regex(/^[0-9a-fA-F]{24}$/)).optional(),
     reportingTo: objectIdSchema,
+    department: z.string().max(100).trim().optional(),
+    designation: z.string().max(100).trim().optional(),
   }),
 });
 
@@ -119,6 +147,8 @@ export const acceptInvitationSchema = z.object({
 });
 
 export default {
+  sendOtpSchema,
+  verifyOtpSchema,
   registerSchema,
   loginSchema,
   changePasswordSchema,

@@ -1,5 +1,8 @@
 import express from "express";
 import {
+  sendOtp,
+  verifyOtp,
+  resendOtp,
   register,
   login,
   logout,
@@ -17,6 +20,12 @@ import permissionMiddleware from "../../middlewares/permission.middleware.js";
 import { USER_INVITE } from "../../constants/permissions.js";
 import validate from "../../middlewares/validate.middleware.js";
 import {
+  otpSendLimiter,
+  otpVerifyLimiter,
+} from "../../middlewares/otpRateLimit.middleware.js";
+import {
+  sendOtpSchema,
+  verifyOtpSchema,
   registerSchema,
   loginSchema,
   changePasswordSchema,
@@ -29,6 +38,34 @@ import {
 const router = express.Router();
 
 /* -------------------- PUBLIC ROUTES -------------------- */
+
+/* -------- OTP ROUTES -------- */
+
+// Send OTP to email
+router.post(
+  "/send-otp",
+  otpSendLimiter,
+  validate(sendOtpSchema),
+  sendOtp
+);
+
+// Verify OTP
+router.post(
+  "/verify-otp",
+  otpVerifyLimiter,
+  validate(verifyOtpSchema),
+  verifyOtp
+);
+
+// Resend OTP
+router.post(
+  "/resend-otp",
+  otpSendLimiter,
+  validate(sendOtpSchema),
+  resendOtp
+);
+
+/* -------- REGISTRATION -------- */
 
 // Register new organization with CEO
 router.post("/register", validate(registerSchema), register);
