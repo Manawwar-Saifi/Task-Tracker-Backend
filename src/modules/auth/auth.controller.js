@@ -116,9 +116,12 @@ export const login = asyncHandler(async (req, res) => {
  * @access  Private
  */
 export const logout = asyncHandler(async (req, res) => {
-  await authService.logoutUser(req.user.userId);
+  // Clear DB refreshToken if user is identified (token may be expired but user still set by optionalAuth)
+  if (req.user?.userId) {
+    await authService.logoutUser(req.user.userId);
+  }
 
-  // Clear refresh token cookie
+  // Always clear the cookie regardless of auth state
   res.clearCookie("refreshToken", REFRESH_TOKEN_COOKIE_OPTIONS);
 
   return successResponse(res, 200, "Logged out successfully");

@@ -16,7 +16,7 @@ import {
   getMe,
   verifyToken,
 } from "./auth.controller.js";
-import authMiddleware from "../../middlewares/auth.middleware.js";
+import authMiddleware, { optionalAuth } from "../../middlewares/auth.middleware.js";
 import permissionMiddleware from "../../middlewares/permission.middleware.js";
 import { USER_INVITE } from "../../constants/permissions.js";
 import validate from "../../middlewares/validate.middleware.js";
@@ -103,8 +103,8 @@ router.post(
 
 /* -------------------- PROTECTED ROUTES -------------------- */
 
-// Logout
-router.post("/logout", authMiddleware, logout);
+// Logout — optionalAuth so it works even with an expired token
+router.post("/logout", optionalAuth, logout);
 
 // Get current user
 router.get("/me", authMiddleware, getMe);
