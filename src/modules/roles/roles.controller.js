@@ -7,6 +7,7 @@ import Role from "./roles.model.js";
 import asyncHandler from "../../utils/asyncHandler.js";
 import { successResponse } from "../../utils/apiResponse.js";
 import AppError from "../../utils/AppError.js";
+import { PERMISSIONS_BY_MODULE } from "../../constants/permissions.js";
 
 /**
  * Get all roles for organization
@@ -130,10 +131,32 @@ export const deleteRole = asyncHandler(async (req, res) => {
   return successResponse(res, 200, "Role deleted successfully");
 });
 
+/**
+ * Get all available permissions (grouped by module)
+ * GET /api/v1/permissions
+ */
+export const getPermissions = asyncHandler(async (req, res) => {
+  // Flatten PERMISSIONS_BY_MODULE into an array, each entry has { code, name, description, module }
+  const permissions = Object.entries(PERMISSIONS_BY_MODULE).flatMap(
+    ([moduleName, perms]) =>
+      perms.map((p) => ({ ...p, module: moduleName.toLowerCase() }))
+  );
+
+  const byModule = Object.fromEntries(
+    Object.entries(PERMISSIONS_BY_MODULE).map(([moduleName, perms]) => [
+      moduleName.toLowerCase(),
+      perms.map((p) => ({ ...p, module: moduleName.toLowerCase() })),
+    ])
+  );
+
+  return successResponse(res, 200, "Permissions retrieved", { permissions, byModule });
+});
+
 export default {
   getRoles,
   getRole,
   createRole,
   updateRole,
   deleteRole,
+  getPermissions,
 };

@@ -11,6 +11,9 @@ const router = express.Router();
 // All routes require authentication
 router.use(authMiddleware);
 
+// Get all available permissions (must come before /:id)
+router.get("/permissions/list", rolesController.getPermissions);
+
 // Get all roles
 router.get("/", rolesController.getRoles);
 
