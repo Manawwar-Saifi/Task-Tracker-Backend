@@ -42,17 +42,21 @@ export default async function handler(req, res) {
     // Pass request to Express app
     return app(req, res);
   } catch (error) {
-    console.error("Vercel handler error:", error.message);
+    // Always log the real error so it appears in Vercel function logs
+    console.error("[VERCEL] Handler error:", error.message);
+    console.error("[VERCEL] Stack:", error.stack);
 
-    const statusCode = error.message.includes("MONGO_URI") ? 500 : 503;
+    const isMissingEnv =
+      error.message.includes("MONGO_URI") ||
+      error.message.includes("Missing required env");
+    const statusCode = isMissingEnv ? 500 : 503;
 
     return res.status(statusCode).json({
       success: false,
       error: "Server initialization failed",
-      message:
-        process.env.NODE_ENV === "production"
-          ? "Service temporarily unavailable. Please try again."
-          : error.message,
+      message: isMissingEnv
+        ? "Server misconfiguration: missing environment variables. Check Vercel dashboard."
+        : "Service temporarily unavailable. Please try again.",
     });
   }
 }

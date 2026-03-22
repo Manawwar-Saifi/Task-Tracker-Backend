@@ -7,19 +7,21 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-// Required environment variables (will throw if missing)
+// Required environment variables (critical — server cannot work without these)
 const requiredEnvVars = [
-  "NODE_ENV",
-  "PORT",
   "MONGO_URI",
   "JWT_ACCESS_SECRET",
   "JWT_REFRESH_SECRET",
 ];
 
-// Validate required vars exist
+// Validate required vars — warn loudly but don't throw at module level
+// (throwing here crashes Vercel serverless before the handler can catch it)
 const missingVars = requiredEnvVars.filter((v) => !process.env[v]);
 if (missingVars.length > 0 && process.env.NODE_ENV !== "test") {
-  throw new Error(`Missing required env variables: ${missingVars.join(", ")}`);
+  console.error(
+    `[ENV] FATAL: Missing required env variables: ${missingVars.join(", ")}. ` +
+    `Set these in your Vercel Dashboard → Settings → Environment Variables.`
+  );
 }
 
 /**
