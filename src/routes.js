@@ -10,7 +10,7 @@ import authRoutes from "./modules/auth/auth.routes.js";
 import userRoutes from "./modules/users/routes.js";
 
 /* -------------------- ORGANIZATIONS -------------------- */
-// import organizationRoutes from "./modules/organizations/organization.routes.js";
+import organizationRoutes from "./modules/organizations/routes.js";
 
 /* -------------------- MEMBERSHIPS -------------------- */
 // import membershipRoutes from "./modules/memberships/organization-memberships.routes.js";
@@ -68,7 +68,7 @@ router.post(
 /* -------------------- ROUTE REGISTRATION -------------------- */
 router.use("/auth", authRoutes);
 router.use("/users", userRoutes);
-// router.use("/organizations", organizationRoutes);
+router.use("/organizations", organizationRoutes);
 // router.use("/memberships", membershipRoutes);
 router.use("/roles", roleRoutes);
 // router.use("/permissions", permissionRoutes);

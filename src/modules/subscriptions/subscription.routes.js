@@ -19,7 +19,7 @@ router.use(authMiddleware);
  */
 
 // Get available plans
-router.get("/plans", validate(validation.getPlansSchema), controller.getPlans);
+router.get("/plans", validate(validation.getPlansQuerySchema), controller.getPlans);
 
 // Get current subscription
 router.get("/", controller.getSubscription);

@@ -123,8 +123,15 @@ export const checkUserLimit = async (organizationId) => {
     return { canAdd: true, current: currentUsers, limit: FREE_USER_LIMIT };
   }
 
-  const currentUsers = subscription.usage?.currentUsers || 0;
   const maxUsers = plan.limits?.maxUsers || 5;
+
+  // Always count actual users from DB to avoid drift from seeders or bulk ops
+  const User = (await import("../users/model.js")).default;
+  const currentUsers = await User.countDocuments({
+    organizationId,
+    isDeleted: false,
+    status: { $ne: "invited" },
+  });
 
   console.log(`[USER LIMIT] Plan: ${plan.name}, Current: ${currentUsers}, Max: ${maxUsers}`);
 

@@ -11,6 +11,7 @@ import {
   forgotPassword,
   resetPassword,
   inviteUser,
+  verifyInvitation,
   acceptInvitation,
   getMe,
   verifyToken,
@@ -89,6 +90,9 @@ router.post(
   validate(resetPasswordSchema),
   resetPassword
 );
+
+// Verify invitation token (get invite details)
+router.get("/verify-invite/:token", verifyInvitation);
 
 // Accept invitation
 router.post(

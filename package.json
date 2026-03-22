@@ -8,6 +8,7 @@
     "start": "node --env-file=.env server.js",
     "dev": "node --env-file=.env --watch server.js",
     "seed": "node --env-file=.env src/seed.js",
+    "seed:plans": "node --env-file=.env src/seeders/planSeeder.js",
     "seed:admin": "node --env-file=.env src/seeders/adminSeeder.js",
     "seed:users": "node --env-file=.env src/seeders/mockUsersSeeder.js",
     "fix:owner": "node --env-file=.env src/seeders/fixOwnerPermissions.js",

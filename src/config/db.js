@@ -61,9 +61,11 @@ const connectDB = async () => {
 
   // If connection is in progress, wait for it
   if (!cached.promise) {
+    const isServerless = !!process.env.VERCEL;
+
     const opts = {
-      bufferCommands: false, // Disable mongoose buffering for serverless
-      maxPoolSize: 10, // Limit connections for serverless
+      bufferCommands: !isServerless, // false on Vercel, true locally
+      maxPoolSize: isServerless ? 10 : 100,
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
     };

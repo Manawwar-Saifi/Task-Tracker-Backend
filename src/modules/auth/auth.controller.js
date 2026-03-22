@@ -231,6 +231,19 @@ export const inviteUser = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Verify invitation token and return invite details
+ * @route   GET /api/v1/auth/verify-invite/:token
+ * @access  Public
+ */
+export const verifyInvitation = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+
+  const data = await authService.verifyInvitation(token);
+
+  return successResponse(res, 200, "Invitation is valid", data);
+});
+
+/**
  * @desc    Accept invitation and set password
  * @route   POST /api/v1/auth/accept-invite/:token
  * @access  Public

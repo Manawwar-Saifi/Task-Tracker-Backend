@@ -32,7 +32,10 @@ const PLAN_PRICING = {
  * Get subscription for organization
  */
 export const getSubscription = async (organizationId) => {
-  const subscription = await Subscription.getByOrganization(organizationId);
+  const subscription = await Subscription.findOne({
+    organizationId,
+    isDeleted: { $ne: true },
+  }).lean();
 
   if (!subscription) {
     throw new AppError("Subscription not found", 404);
@@ -257,7 +260,7 @@ export const updateUsage = async (organizationId, data) => {
  * Check if feature is enabled
  */
 export const checkFeature = async (organizationId, feature) => {
-  const subscription = await Subscription.getByOrganization(organizationId);
+  const subscription = await Subscription.findOne({ organizationId, isDeleted: { $ne: true } }).lean();
 
   if (!subscription) {
     return false;
@@ -276,7 +279,7 @@ export const checkFeature = async (organizationId, feature) => {
  * Check if usage is within limits
  */
 export const checkLimit = async (organizationId, limitType) => {
-  const subscription = await Subscription.getByOrganization(organizationId);
+  const subscription = await Subscription.findOne({ organizationId, isDeleted: { $ne: true } }).lean();
 
   if (!subscription) {
     return false;

@@ -5,7 +5,11 @@
  * Run: node --env-file=.env src/scripts/fixSubscription.js
  */
 import mongoose from "mongoose";
+import dns from "dns";
 import Organization from "../modules/organizations/model.js";
+
+// Use Google DNS for SRV record resolution (fixes router DNS issues)
+dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 import Subscription from "../modules/billing/subscription.model.js";
 import Plan from "../modules/billing/plan.model.js";
 

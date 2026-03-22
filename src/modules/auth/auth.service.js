@@ -8,7 +8,8 @@ import "../teams/teams.model.js"; // Register Team model for populate
 import { seedOrganizationRoles } from "../../seeders/permissionSeeder.js";
 import AppError from "../../utils/AppError.js";
 import logger from "../../utils/logger.js";
-import { sendOtpEmail } from "../../services/email.service.js";
+import { sendOtpEmail, sendInvitationEmail } from "../../services/email.service.js";
+import { env } from "../../config/env.js";
 import {
   createTrialSubscription,
   getSubscriptionStatus,
@@ -619,12 +620,60 @@ export const inviteUser = async (
 
   logger.info(`User invited: ${email} to org: ${organizationId}`);
 
-  // TODO: Send invitation email
-  // await sendInvitationEmail(user.email, inviteToken);
+  // Increment subscription user count
+  await incrementUserCount(organizationId);
+
+  // Fetch inviter name and org name for email
+  const [inviter, organization] = await Promise.all([
+    User.findById(invitedBy).select("firstName lastName"),
+    Organization.findById(organizationId).select("name"),
+  ]);
+
+  const inviterName = inviter ? `${inviter.firstName} ${inviter.lastName}` : "Your team";
+  const orgName = organization?.name || "the organization";
+  const inviteUrl = `${env.CLIENT_URL}/accept-invite/${inviteToken}`;
+
+  // Send invitation email (non-blocking — don't fail invite if email fails)
+  sendInvitationEmail(email, inviterName, orgName, inviteUrl).catch((err) => {
+    logger.error(`Failed to send invite email to ${email}:`, err.message);
+  });
 
   return {
     user: sanitizeUser(user),
-    inviteToken, // Remove in production
+    ...(env.isDev && { inviteToken }), // Only expose token in development
+  };
+};
+
+/**
+ * Verify invitation token and return invite details (without accepting)
+ */
+export const verifyInvitation = async (inviteToken) => {
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(inviteToken)
+    .digest("hex");
+
+  const user = await User.findOne({
+    inviteToken: hashedToken,
+    inviteTokenExpiry: { $gt: new Date() },
+    status: "invited",
+    isDeleted: false,
+  }).populate("roleId", "name");
+
+  if (!user) {
+    throw new AppError("Invalid or expired invitation", 400);
+  }
+
+  const organization = await Organization.findById(user.organizationId).select("name");
+  const inviter = await User.findById(user.invitedBy).select("firstName lastName");
+
+  return {
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    organizationName: organization?.name || "the organization",
+    roleName: user.roleId?.name || "Employee",
+    invitedBy: inviter ? `${inviter.firstName} ${inviter.lastName}` : "Your team",
   };
 };
 

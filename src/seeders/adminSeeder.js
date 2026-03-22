@@ -5,6 +5,8 @@ import User from "../modules/users/model.js";
 import Organization from "../modules/organizations/model.js";
 import Role from "../modules/roles/roles.model.js";
 import { seedSystemPermissions, seedOrganizationRoles } from "./permissionSeeder.js";
+import { seedPlans } from "./planSeeder.js";
+import { createTrialSubscription } from "../modules/billing/subscription.service.js";
 import logger from "../utils/logger.js";
 
 // Load environment variables
@@ -179,6 +181,14 @@ const createCompanyCEO = async () => {
     organization.ownerUserId = user._id;
     await organization.save();
 
+    // Create trial subscription for the demo org
+    try {
+      await createTrialSubscription(organization._id);
+      logger.info(`Trial subscription created for: ${companyCEO.organization.name}`);
+    } catch (subError) {
+      logger.warn(`Could not create trial subscription: ${subError.message}`);
+    }
+
     logger.info(`✅ Company CEO created successfully!`);
     logger.info(`   Organization: ${companyCEO.organization.name}`);
     logger.info(`   Email: ${companyCEO.email}`);
@@ -210,6 +220,10 @@ const runAdminSeeder = async () => {
     // Create Super Admin
     logger.info("\n👤 Creating Super Admin...");
     await createSuperAdmin();
+
+    // Seed plans (required for subscription creation)
+    logger.info("\n💳 Seeding subscription plans...");
+    await seedPlans();
 
     // Create Company CEO
     logger.info("\n👔 Creating Company CEO...");
