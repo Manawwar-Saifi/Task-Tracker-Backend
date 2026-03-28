@@ -76,9 +76,20 @@ export const endBreak = asyncHandler(async (req, res) => {
  * GET /attendance
  */
 export const getAttendance = asyncHandler(async (req, res) => {
+  const { isOwner, isSuperAdmin, roleLevel, userId, permissions, directPermissions } = req.user;
+  const allPerms = new Set([...(permissions || []), ...(directPermissions || [])]);
+  let scopedQuery = { ...req.query };
+
+  // Scope by role: employee sees only own, team lead sees team, admin sees all
+  if (!isOwner && !isSuperAdmin && roleLevel !== 1) {
+    if (allPerms.has("ATTENDANCE_VIEW_ALL")) { /* see all */ }
+    else if (allPerms.has("ATTENDANCE_VIEW_TEAM")) { /* team scope — pass through, filtered by teamId if set */ }
+    else { scopedQuery.userId = userId; } // VIEW_OWN — only own records
+  }
+
   const data = await attendanceService.getAttendance(
     req.user.organizationId,
-    req.query
+    scopedQuery
   );
   return successResponse(res, 200, "Attendance records retrieved", data);
 });
@@ -115,9 +126,18 @@ export const getTeamAttendance = asyncHandler(async (req, res) => {
  * GET /attendance/summary
  */
 export const getSummary = asyncHandler(async (req, res) => {
+  const { isOwner, isSuperAdmin, roleLevel, userId, permissions, directPermissions } = req.user;
+  const allPerms = new Set([...(permissions || []), ...(directPermissions || [])]);
+  let scopedQuery = { ...req.query };
+
+  if (!isOwner && !isSuperAdmin && roleLevel !== 1) {
+    if (allPerms.has("ATTENDANCE_VIEW_ALL")) { /* see all */ }
+    else { scopedQuery.userId = userId; } // Own stats only
+  }
+
   const data = await attendanceService.getSummary(
     req.user.organizationId,
-    req.query
+    scopedQuery
   );
   return successResponse(res, 200, "Attendance summary retrieved", data);
 });

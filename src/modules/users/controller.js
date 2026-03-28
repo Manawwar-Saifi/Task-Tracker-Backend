@@ -136,6 +136,37 @@ export const getAvailableUsersForTeam = asyncHandler(async (req, res) => {
   return successResponse(res, 200, "Available users fetched", { users });
 });
 
+/**
+ * @desc    Assign direct permissions to a user
+ * @route   PUT /api/v1/users/:id/permissions
+ * @access  Protected + USER_MANAGE
+ */
+export const assignUserPermissions = asyncHandler(async (req, res) => {
+  const { permissions } = req.body;
+
+  const user = await usersService.assignUserPermissions(
+    req.params.id,
+    req.user.organizationId,
+    permissions
+  );
+
+  return successResponse(res, 200, "User permissions updated successfully", { user });
+});
+
+/**
+ * @desc    Get a user's permissions (direct + role)
+ * @route   GET /api/v1/users/:id/permissions
+ * @access  Protected + USER_READ
+ */
+export const getUserPermissions = asyncHandler(async (req, res) => {
+  const data = await usersService.getUserPermissions(
+    req.params.id,
+    req.user.organizationId
+  );
+
+  return successResponse(res, 200, "User permissions fetched", data);
+});
+
 // Legacy exports for backward compatibility
 export const getUserById = getUser;
 export const updateUserStatus = changeStatus;

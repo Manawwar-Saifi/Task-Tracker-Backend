@@ -232,7 +232,11 @@ export const getAllSalaries = async (organizationId, options = {}) => {
     isActive: true,
     isDeleted: false,
   })
-    .populate("userId", "firstName lastName email employeeId department designation")
+    .populate({
+      path: "userId",
+      select: "firstName lastName email employeeId department designation roleId",
+      populate: { path: "roleId", select: "name level" },
+    })
     .sort({ "userId.firstName": 1 })
     .lean();
 

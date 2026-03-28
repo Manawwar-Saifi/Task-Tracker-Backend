@@ -267,8 +267,77 @@ const getInvitationTemplate = (inviterName, organizationName, inviteUrl) => `
 </html>
 `;
 
+/**
+ * Send dependency notification email
+ */
+export const sendDependencyEmail = async (
+  email,
+  creatorName,
+  blockingTaskTitle,
+  yourTaskTitle,
+  recipientName
+) => {
+  const mailOptions = {
+    from: `"Task Tracker" <${env.FROM_EMAIL}>`,
+    to: email,
+    subject: `Action needed: "${yourTaskTitle}" is blocking "${blockingTaskTitle}"`,
+    html: getDependencyTemplate(creatorName, blockingTaskTitle, yourTaskTitle, recipientName),
+    text: `Hi ${recipientName}, ${creatorName} marked your task "${yourTaskTitle}" as a dependency for "${blockingTaskTitle}". Please complete it to unblock the team.`,
+  };
+
+  return sendEmail(mailOptions);
+};
+
+const getDependencyTemplate = (creatorName, blockingTask, yourTask, recipientName) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa; }
+    .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; }
+    .card { background: #ffffff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 40px; }
+    .logo { text-align: center; margin-bottom: 30px; }
+    .logo h1 { color: #0d9488; margin: 0; font-size: 28px; }
+    h2 { color: #1e293b; margin: 0 0 16px; font-size: 22px; }
+    p { color: #475569; line-height: 1.6; margin: 0 0 16px; }
+    .task-box { padding: 16px; border-radius: 8px; margin: 16px 0; }
+    .blocking { background: #fef3c7; border: 1px solid #f59e0b; }
+    .your-task { background: #dbeafe; border: 1px solid #3b82f6; }
+    .task-label { font-size: 12px; font-weight: 600; text-transform: uppercase; color: #64748b; margin-bottom: 4px; }
+    .task-title { font-size: 16px; font-weight: 700; color: #1e293b; }
+    .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
+    .footer p { color: #94a3b8; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="logo"><h1>Task Tracker</h1></div>
+      <h2>You have a dependency request</h2>
+      <p>Hi <strong>${recipientName}</strong>,</p>
+      <p><strong>${creatorName}</strong> has marked your task as a dependency. Your task needs to be completed to unblock the following:</p>
+      <div class="task-box blocking">
+        <div class="task-label">Blocked Task</div>
+        <div class="task-title">${blockingTask}</div>
+      </div>
+      <div class="task-box your-task">
+        <div class="task-label">Your Task (dependency)</div>
+        <div class="task-title">${yourTask}</div>
+      </div>
+      <p>Please prioritize and complete your task so the team can proceed. Your manager has also been notified.</p>
+      <div class="footer">
+        <p>&copy; ${new Date().getFullYear()} Task Tracker. All rights reserved.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
 export default {
   sendOtpEmail,
   sendPasswordResetEmail,
   sendInvitationEmail,
+  sendDependencyEmail,
 };

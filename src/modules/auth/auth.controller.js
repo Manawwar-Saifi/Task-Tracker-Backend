@@ -224,13 +224,20 @@ export const inviteUser = asyncHandler(async (req, res) => {
     }
   );
 
-  return successResponse(res, 201, "Invitation sent successfully", {
-    user: data.user,
-    // Include invite token in dev mode only
-    ...(process.env.NODE_ENV === "development" && {
-      inviteToken: data.inviteToken,
-    }),
-  });
+  return successResponse(
+    res,
+    201,
+    data.emailSent ? "Invitation sent successfully" : "User created but email could not be sent",
+    {
+      user: data.user,
+      emailSent: data.emailSent,
+      // Include invite details in dev mode only
+      ...(process.env.NODE_ENV === "development" && {
+        inviteToken: data.inviteToken,
+        inviteUrl: data.inviteUrl,
+      }),
+    }
+  );
 });
 
 /**
@@ -279,6 +286,49 @@ export const getMe = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Update own profile
+ * @route   PUT /api/v1/auth/profile
+ * @access  Private
+ */
+export const updateProfile = asyncHandler(async (req, res) => {
+  const data = await authService.updateProfile(req.user.userId, req.body);
+  return successResponse(res, 200, "Profile updated", data);
+});
+
+/**
+ * @desc    Upload avatar
+ * @route   PUT /api/v1/auth/avatar
+ * @access  Private
+ */
+export const uploadAvatar = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: "No file uploaded" });
+  }
+  const data = await authService.uploadAvatar(req.user.userId, req.file);
+  return successResponse(res, 200, "Avatar updated", data);
+});
+
+/**
+ * @desc    Update preferences
+ * @route   PUT /api/v1/auth/preferences
+ * @access  Private
+ */
+export const updatePreferences = asyncHandler(async (req, res) => {
+  const data = await authService.updatePreferences(req.user.userId, req.body);
+  return successResponse(res, 200, "Preferences updated", data);
+});
+
+/**
+ * @desc    Get preferences
+ * @route   GET /api/v1/auth/preferences
+ * @access  Private
+ */
+export const getPreferences = asyncHandler(async (req, res) => {
+  const data = await authService.getPreferences(req.user.userId);
+  return successResponse(res, 200, "Preferences retrieved", data);
+});
+
+/**
  * @desc    Verify token validity
  * @route   GET /api/v1/auth/verify
  * @access  Private
@@ -307,4 +357,8 @@ export default {
   acceptInvitation,
   getMe,
   verifyToken,
+  updateProfile,
+  uploadAvatar,
+  updatePreferences,
+  getPreferences,
 };

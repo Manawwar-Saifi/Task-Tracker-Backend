@@ -24,6 +24,17 @@ if (missingVars.length > 0 && process.env.NODE_ENV !== "test") {
   );
 }
 
+// Warn about placeholder values that will break in production
+if (process.env.NODE_ENV === "production") {
+  const clientUrl = process.env.CLIENT_URL || "";
+  if (clientUrl.includes("your-frontend") || clientUrl.includes("your-backend")) {
+    console.error("[ENV] WARNING: CLIENT_URL is still a placeholder! Invite links will be broken.");
+  }
+  if (!process.env.SMTP_USER || process.env.SMTP_USER === "your-email@gmail.com") {
+    console.error("[ENV] WARNING: SMTP_USER not configured — invitation emails will not be sent.");
+  }
+}
+
 /**
  * Centralized environment configuration
  * Import this instead of accessing process.env directly
@@ -32,7 +43,13 @@ export const env = {
   // Server
   NODE_ENV: process.env.NODE_ENV || "development",
   PORT: parseInt(process.env.PORT, 10) || 5000,
-  CLIENT_URL: process.env.CLIENT_URL || "http://localhost:5173",
+  CLIENT_URL: process.env.CLIENT_URL || "http://localhost:5174",
+
+  // CORS — array of allowed origins
+  CORS_ORIGINS: (process.env.CORS_ORIGINS || process.env.CLIENT_URL || "http://localhost:5174")
+    .split(",")
+    .map((u) => u.trim())
+    .filter(Boolean),
 
   // Database
   MONGO_URI: process.env.MONGO_URI,

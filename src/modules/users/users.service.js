@@ -400,6 +400,55 @@ const sanitizeUser = (user) => {
   return obj;
 };
 
+/**
+ * Assign direct permissions to a specific user
+ */
+export const assignUserPermissions = async (userId, organizationId, permissions) => {
+  const user = await User.findOne({
+    _id: userId,
+    organizationId,
+    isDeleted: false,
+  });
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  user.permissions = permissions;
+  await user.save();
+
+  logger.info(`Direct permissions updated for user ${userId}: ${permissions.length} permissions`);
+
+  const populated = await User.findById(user._id)
+    .populate("roleId", "name level permissionCodes")
+    .select("-password -refreshToken");
+
+  return sanitizeUser(populated);
+};
+
+/**
+ * Get a specific user's direct permissions
+ */
+export const getUserPermissions = async (userId, organizationId) => {
+  const user = await User.findOne({
+    _id: userId,
+    organizationId,
+    isDeleted: false,
+  })
+    .populate("roleId", "name level permissionCodes")
+    .select("firstName lastName email permissions roleId");
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  return {
+    directPermissions: user.permissions || [],
+    rolePermissions: user.roleId?.permissionCodes || [],
+    roleName: user.roleId?.name || "No Role",
+  };
+};
+
 export default {
   createUser,
   getUsers,
@@ -409,4 +458,6 @@ export default {
   assignRole,
   deleteUser,
   getAvailableUsersForTeam,
+  assignUserPermissions,
+  getUserPermissions,
 };

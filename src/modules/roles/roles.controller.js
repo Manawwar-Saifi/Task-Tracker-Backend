@@ -4,6 +4,7 @@
  */
 
 import Role from "./roles.model.js";
+import User from "../users/model.js";
 import asyncHandler from "../../utils/asyncHandler.js";
 import { successResponse } from "../../utils/apiResponse.js";
 import AppError from "../../utils/AppError.js";
@@ -14,13 +15,31 @@ import { PERMISSIONS_BY_MODULE } from "../../constants/permissions.js";
  * GET /api/v1/roles
  */
 export const getRoles = asyncHandler(async (req, res) => {
+  const orgId = req.user.organizationId;
+
   const roles = await Role.find({
-    organizationId: req.user.organizationId,
+    organizationId: orgId,
     isDeleted: false,
     isActive: true,
-  }).sort({ level: 1 });
+  }).sort({ level: 1 }).lean();
 
-  return successResponse(res, 200, "Roles retrieved successfully", { roles });
+  // Count users per role
+  const userCounts = await User.aggregate([
+    { $match: { organizationId: orgId, isDeleted: false } },
+    { $group: { _id: "$roleId", count: { $sum: 1 } } },
+  ]);
+
+  const countMap = {};
+  userCounts.forEach((uc) => {
+    if (uc._id) countMap[uc._id.toString()] = uc.count;
+  });
+
+  const rolesWithCount = roles.map((role) => ({
+    ...role,
+    userCount: countMap[role._id.toString()] || 0,
+  }));
+
+  return successResponse(res, 200, "Roles retrieved successfully", { roles: rolesWithCount });
 });
 
 /**

@@ -25,10 +25,16 @@ app.set("trust proxy", 1);
 // Set security HTTP headers
 app.use(helmet());
 
-// Enable CORS - Allow all origins for development
+// Enable CORS — use CORS_ORIGINS array in production, allow all in dev
+const allowedOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(",").map((u) => u.trim()).filter(Boolean)
+  : [];
+
 app.use(
   cors({
-    origin: true, // Allow all origins
+    origin: process.env.NODE_ENV === "production" && allowedOrigins.length > 0
+      ? allowedOrigins
+      : true,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],

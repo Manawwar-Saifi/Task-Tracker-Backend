@@ -27,7 +27,10 @@ const nameSchema = z
 // MongoDB ObjectId validation
 const objectIdSchema = z
   .string()
-  .regex(/^[0-9a-fA-F]{24}$/, "Invalid ID format")
+  .transform((val) => (val === '' ? undefined : val))
+  .pipe(
+    z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid ID format").optional()
+  )
   .optional();
 
 // OTP validation
@@ -124,7 +127,7 @@ export const resetPasswordSchema = z.object({
 export const inviteUserSchema = z.object({
   body: z.object({
     firstName: nameSchema,
-    lastName: nameSchema,
+    lastName: z.string().max(50).trim().optional().default(''),
     email: emailSchema,
     roleId: objectIdSchema,
     teamIds: z.array(z.string().regex(/^[0-9a-fA-F]{24}$/)).optional(),

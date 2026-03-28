@@ -11,6 +11,8 @@ import {
   updateUser,
   changeStatus,
   assignRole,
+  assignUserPermissions,
+  getUserPermissions,
   deleteUser,
   getAvailableUsersForTeam,
 } from "./controller.js";
@@ -32,6 +34,7 @@ import {
   USER_DELETE,
   USER_VIEW_ALL,
   USER_ASSIGN_ROLE,
+  USER_MANAGE,
   TEAM_ADD_MEMBER,
 } from "../../constants/permissions.js";
 
@@ -96,6 +99,20 @@ router.put(
   permissionMiddleware(USER_ASSIGN_ROLE),
   validate(assignRoleSchema),
   assignRole
+);
+
+// Get user's permissions (direct + role)
+router.get(
+  "/:id/permissions",
+  permissionMiddleware(USER_READ),
+  getUserPermissions
+);
+
+// Assign direct permissions to user
+router.put(
+  "/:id/permissions",
+  permissionMiddleware(USER_MANAGE),
+  assignUserPermissions
 );
 
 // Delete user

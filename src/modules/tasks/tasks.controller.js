@@ -12,7 +12,28 @@ import * as taskService from "./tasks.service.js";
  * GET /tasks
  */
 export const getTasks = asyncHandler(async (req, res) => {
-  const data = await taskService.getTasks(req.user.organizationId, req.query);
+  // Scope query based on user's role level
+  const { isOwner, isSuperAdmin, roleLevel, userId, permissions, directPermissions } = req.user;
+  const allPerms = new Set([...(permissions || []), ...(directPermissions || [])]);
+
+  let scopedQuery = { ...req.query };
+
+  // CEO/Owner/SuperAdmin see all
+  if (!isOwner && !isSuperAdmin && roleLevel !== 1) {
+    if (allPerms.has("TASK_VIEW_ALL")) {
+      // See all org tasks
+    } else if (allPerms.has("TASK_VIEW_TEAM")) {
+      // See team tasks + own tasks — handled by adding userId context
+      scopedQuery._viewScope = "team";
+      scopedQuery._userId = userId;
+    } else {
+      // VIEW_OWN — only own tasks
+      scopedQuery._viewScope = "own";
+      scopedQuery._userId = userId;
+    }
+  }
+
+  const data = await taskService.getTasks(req.user.organizationId, scopedQuery);
   return successResponse(res, 200, "Tasks retrieved", data);
 });
 
@@ -68,10 +89,17 @@ export const getFilters = asyncHandler(async (req, res) => {
  * GET /tasks/stats
  */
 export const getStats = asyncHandler(async (req, res) => {
-  const stats = await taskService.getStats(
-    req.user.organizationId,
-    req.query
-  );
+  const { isOwner, isSuperAdmin, roleLevel, userId, permissions, directPermissions } = req.user;
+  const allPerms = new Set([...(permissions || []), ...(directPermissions || [])]);
+  let scopedQuery = { ...req.query };
+
+  if (!isOwner && !isSuperAdmin && roleLevel !== 1) {
+    if (allPerms.has("TASK_VIEW_ALL")) { /* see all */ }
+    else if (allPerms.has("TASK_VIEW_TEAM")) { scopedQuery._viewScope = "team"; scopedQuery._userId = userId; }
+    else { scopedQuery._viewScope = "own"; scopedQuery._userId = userId; }
+  }
+
+  const stats = await taskService.getStats(req.user.organizationId, scopedQuery);
   return successResponse(res, 200, "Task statistics retrieved", { stats });
 });
 
@@ -80,9 +108,19 @@ export const getStats = asyncHandler(async (req, res) => {
  * GET /tasks/kanban
  */
 export const getTasksByStatus = asyncHandler(async (req, res) => {
+  const { isOwner, isSuperAdmin, roleLevel, userId, permissions, directPermissions } = req.user;
+  const allPerms = new Set([...(permissions || []), ...(directPermissions || [])]);
+  let scopedQuery = { ...req.query };
+
+  if (!isOwner && !isSuperAdmin && roleLevel !== 1) {
+    if (allPerms.has("TASK_VIEW_ALL")) { /* see all */ }
+    else if (allPerms.has("TASK_VIEW_TEAM")) { scopedQuery._viewScope = "team"; scopedQuery._userId = userId; }
+    else { scopedQuery._viewScope = "own"; scopedQuery._userId = userId; }
+  }
+
   const tasks = await taskService.getTasksByStatus(
     req.user.organizationId,
-    req.query
+    scopedQuery
   );
   return successResponse(res, 200, "Tasks by status retrieved", { tasks });
 });

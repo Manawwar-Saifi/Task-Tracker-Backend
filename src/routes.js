@@ -40,6 +40,9 @@ import hrRoutes from "./modules/hr/hr.routes.js";
 /* -------------------- NOTIFICATIONS -------------------- */
 import notificationRoutes from "./modules/notifications/notifications.routes.js";
 
+/* -------------------- SEARCH -------------------- */
+import searchRoutes from "./modules/search/search.routes.js";
+
 /* -------------------- REPORTS -------------------- */
 import reportRoutes from "./modules/reports/report.routes.js";
 
@@ -80,6 +83,7 @@ router.use("/holidays", holidayRoutes);
 router.use("/overtime", overtimeRoutes);
 router.use("/hr", hrRoutes);
 router.use("/notifications", notificationRoutes);
+router.use("/search", searchRoutes);
 router.use("/reports", reportRoutes);
 // router.use("/approvals", approvalRoutes);
 router.use("/billing", billingRoutes);

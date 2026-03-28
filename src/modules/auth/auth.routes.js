@@ -15,7 +15,12 @@ import {
   acceptInvitation,
   getMe,
   verifyToken,
+  updateProfile,
+  uploadAvatar,
+  updatePreferences,
+  getPreferences,
 } from "./auth.controller.js";
+import upload from "../../middlewares/upload.middleware.js";
 import authMiddleware, { optionalAuth } from "../../middlewares/auth.middleware.js";
 import permissionMiddleware from "../../middlewares/permission.middleware.js";
 import { USER_INVITE } from "../../constants/permissions.js";
@@ -119,6 +124,16 @@ router.put(
   validate(changePasswordSchema),
   changePassword
 );
+
+// Update own profile
+router.put("/profile", authMiddleware, updateProfile);
+
+// Upload avatar
+router.put("/avatar", authMiddleware, upload.single("avatar"), uploadAvatar);
+
+// Preferences
+router.get("/preferences", authMiddleware, getPreferences);
+router.put("/preferences", authMiddleware, updatePreferences);
 
 // Invite user (requires permission)
 router.post(

@@ -8,6 +8,8 @@ import User from "../users/model.js";
 import Team from "../teams/teams.model.js";
 import AppError from "../../utils/AppError.js";
 import logger from "../../utils/logger.js";
+import { sendNotification } from "../notifications/notifications.service.js";
+import { sendDependencyEmail } from "../../services/email.service.js";
 
 /**
  * Priority order for sorting
@@ -36,6 +38,8 @@ export const getTasks = async (organizationId, options = {}) => {
     overdue,
     dueToday,
     includeHidden = false,
+    _viewScope,
+    _userId,
   } = options;
 
   const query = {
@@ -59,6 +63,18 @@ export const getTasks = async (organizationId, options = {}) => {
   if (priority) query.priority = priority;
   if (userId) query.userId = userId;
   if (teamId) query.teamId = teamId;
+
+  // Role-based scoping: restrict results by permission level
+  if (_viewScope === "own" && _userId) {
+    query.$or = [{ userId: _userId }, { createdBy: _userId }];
+  } else if (_viewScope === "team" && _userId) {
+    // Get user's teams and show tasks from those teams + own tasks
+    const userTeams = await import("../teams/teams.model.js").then((m) =>
+      m.default.find({ organizationId, "members.userId": _userId, isDeleted: false }).select("_id").lean()
+    );
+    const teamIds = userTeams.map((t) => t._id);
+    query.$or = [{ userId: _userId }, { createdBy: _userId }, { teamId: { $in: teamIds } }];
+  }
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -88,6 +104,11 @@ export const getTasks = async (organizationId, options = {}) => {
       .populate("userId", "firstName lastName email avatar")
       .populate("createdBy", "firstName lastName email")
       .populate("teamId", "name")
+      .populate({
+        path: "dependencies.taskId",
+        select: "title status userId",
+        populate: { path: "userId", select: "firstName lastName email avatar" },
+      })
       .sort(sort)
       .skip((page - 1) * limit)
       .limit(limit)
@@ -469,6 +490,56 @@ export const addDependency = async (organizationId, taskId, userId, dependentTas
     .lean();
 
   logger.info(`Dependency added to task ${taskId}: ${dependentTaskId}`);
+
+  // ── Notify dependent task's assignee + hierarchy ──
+  try {
+    const [creator, depTaskFull] = await Promise.all([
+      User.findById(userId).select("firstName lastName"),
+      Task.findById(dependentTaskId).populate("userId", "firstName lastName email reportingTo"),
+    ]);
+    const creatorName = creator ? `${creator.firstName} ${creator.lastName}` : "Someone";
+
+    // 1. Notify the dependent task's assignee
+    if (depTaskFull?.userId) {
+      const assignee = depTaskFull.userId;
+      const assigneeId = assignee._id?.toString();
+
+      await sendNotification(
+        organizationId,
+        assigneeId,
+        "task_assigned",
+        `Dependency: "${task.title}"`,
+        `${creatorName} added your task "${depTaskFull.title}" as a dependency for "${task.title}". Please complete it to unblock the team.`,
+        { link: `/admin/tasks`, data: { taskId, dependentTaskId } }
+      );
+
+      // Send email
+      if (assignee.email) {
+        sendDependencyEmail(
+          assignee.email,
+          creatorName,
+          task.title,
+          depTaskFull.title,
+          assignee.firstName
+        ).catch((err) => logger.error(`Dependency email failed: ${err.message}`));
+      }
+
+      // 2. Notify the assignee's manager (higher hierarchy)
+      if (assignee.reportingTo) {
+        const managerId = typeof assignee.reportingTo === "object" ? assignee.reportingTo._id : assignee.reportingTo;
+        await sendNotification(
+          organizationId,
+          managerId.toString(),
+          "task_assigned",
+          `Team dependency: "${task.title}"`,
+          `${creatorName} added a dependency on "${depTaskFull.title}" (assigned to ${assignee.firstName}). Please ensure it's completed on time.`,
+          { link: `/admin/tasks`, data: { taskId, dependentTaskId } }
+        );
+      }
+    }
+  } catch (notifErr) {
+    logger.error(`Dependency notification failed: ${notifErr.message}`);
+  }
 
   return updated;
 };

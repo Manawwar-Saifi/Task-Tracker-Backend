@@ -633,14 +633,21 @@ export const inviteUser = async (
   const orgName = organization?.name || "the organization";
   const inviteUrl = `${env.CLIENT_URL}/accept-invite/${inviteToken}`;
 
-  // Send invitation email (non-blocking — don't fail invite if email fails)
-  sendInvitationEmail(email, inviterName, orgName, inviteUrl).catch((err) => {
+  // Send invitation email — await so we know if it succeeded
+  let emailSent = false;
+  logger.info(`Sending invite email to ${email}, URL: ${inviteUrl}`);
+  try {
+    await sendInvitationEmail(email, inviterName, orgName, inviteUrl);
+    logger.info(`Invite email sent successfully to ${email}`);
+    emailSent = true;
+  } catch (err) {
     logger.error(`Failed to send invite email to ${email}:`, err.message);
-  });
+  }
 
   return {
     user: sanitizeUser(user),
-    ...(env.isDev && { inviteToken }), // Only expose token in development
+    emailSent,
+    ...(env.isDev && { inviteToken, inviteUrl }), // Only expose in development
   };
 };
 
@@ -691,7 +698,7 @@ export const acceptInvitation = async (inviteToken, password) => {
     inviteTokenExpiry: { $gt: new Date() },
     status: "invited",
     isDeleted: false,
-  });
+  }).populate("roleId", "name level permissionCodes");
 
   if (!user) {
     throw new AppError("Invalid or expired invitation", 400);
@@ -705,8 +712,7 @@ export const acceptInvitation = async (inviteToken, password) => {
   user.dateOfJoining = new Date();
   await user.save();
 
-  // Increment user count in subscription
-  await incrementUserCount(user.organizationId);
+  // Note: user count already incremented during invite, not here
 
   // Generate tokens
   const { accessToken, refreshToken } = generateTokens(user);
@@ -763,6 +769,78 @@ export const getCurrentUser = async (userId) => {
     subscription: subscriptionStatus,
     permissions: await user.getAllPermissions(),
   };
+};
+
+/**
+ * Update own profile (name, phone, department, designation)
+ */
+export const updateProfile = async (userId, data) => {
+  const user = await User.findById(userId);
+  if (!user || user.isDeleted) throw new AppError("User not found", 404);
+
+  // Only allow safe fields
+  const allowed = ["firstName", "lastName", "phone", "department", "designation"];
+  allowed.forEach((field) => {
+    if (data[field] !== undefined) user[field] = data[field];
+  });
+
+  // Notification settings
+  if (data.notificationSettings) {
+    user.notificationSettings = { ...user.notificationSettings?.toObject?.() || {}, ...data.notificationSettings };
+  }
+
+  await user.save();
+  logger.info(`Profile updated: ${user.email}`);
+  return { user: sanitizeUser(user) };
+};
+
+/**
+ * Upload avatar to Cloudinary
+ */
+export const uploadAvatar = async (userId, file) => {
+  const { uploadToCloudinary } = await import("../../utils/cloudinary.util.js");
+
+  const user = await User.findById(userId);
+  if (!user || user.isDeleted) throw new AppError("User not found", 404);
+
+  const result = await uploadToCloudinary(
+    file.buffer,
+    "task-tracker/avatars",
+    `user-${userId}`
+  );
+
+  user.avatar = result.secure_url;
+  await user.save();
+
+  logger.info(`Avatar updated: ${user.email}`);
+  return { avatar: result.secure_url };
+};
+
+/**
+ * Update preferences (timezone, date format, etc.)
+ */
+export const updatePreferences = async (userId, data) => {
+  const user = await User.findById(userId);
+  if (!user || user.isDeleted) throw new AppError("User not found", 404);
+
+  if (data.preferences) {
+    user.preferences = { ...user.preferences?.toObject?.() || {}, ...data.preferences };
+  }
+  if (data.notificationSettings) {
+    user.notificationSettings = { ...user.notificationSettings?.toObject?.() || {}, ...data.notificationSettings };
+  }
+
+  await user.save();
+  return { preferences: user.preferences, notificationSettings: user.notificationSettings };
+};
+
+/**
+ * Get preferences
+ */
+export const getPreferences = async (userId) => {
+  const user = await User.findById(userId).select("preferences notificationSettings");
+  if (!user) throw new AppError("User not found", 404);
+  return { preferences: user.preferences, notificationSettings: user.notificationSettings };
 };
 
 /**

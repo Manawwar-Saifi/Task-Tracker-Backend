@@ -15,7 +15,7 @@ const objectIdSchema = z
 export const requestOvertimeSchema = z.object({
   body: z.object({
     date: z.coerce.date(),
-    hours: z
+    hours: z.coerce
       .number()
       .min(0.5, "Minimum overtime is 0.5 hours")
       .max(12, "Maximum overtime is 12 hours"),

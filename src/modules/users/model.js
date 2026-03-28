@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema(
 
     lastName: {
       type: String,
-      required: [true, "Last name is required"],
+      default: "",
       trim: true,
       maxlength: [50, "Last name cannot exceed 50 characters"],
     },
@@ -216,6 +216,22 @@ const userSchema = new mongoose.Schema(
     loginCount: {
       type: Number,
       default: 0,
+    },
+
+    /* -------------------- PREFERENCES -------------------- */
+    preferences: {
+      timezone: { type: String, default: "Asia/Kolkata" },
+      dateFormat: { type: String, default: "DD/MM/YYYY" },
+      timeFormat: { type: String, default: "12h" },
+      workHoursPerDay: { type: Number, default: 8 },
+    },
+
+    notificationSettings: {
+      emailNotifications: { type: Boolean, default: true },
+      pushNotifications: { type: Boolean, default: true },
+      taskReminders: { type: Boolean, default: true },
+      breakReminders: { type: Boolean, default: false },
+      weeklyReport: { type: Boolean, default: true },
     },
   },
   {

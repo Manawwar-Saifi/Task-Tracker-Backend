@@ -82,17 +82,23 @@ export const getAttendanceReport = async (organizationId, options = {}) => {
     .sort({ date: -1 })
     .lean();
 
-  // Calculate statistics
+  // Calculate statistics using correct model field names
+  const presentRecords = attendanceRecords.filter((a) => a.clockIn);
+  const totalWorkMinutes = attendanceRecords.reduce((sum, a) => sum + (a.effectiveWorkMinutes || 0), 0);
+
   const stats = {
     totalRecords: attendanceRecords.length,
-    totalPresent: attendanceRecords.filter((a) => a.clockInTime).length,
-    totalAbsent: attendanceRecords.filter((a) => !a.clockInTime).length,
-    totalWorkHours: attendanceRecords.reduce((sum, a) => sum + (a.totalHours || 0), 0),
-    totalBreakTime: attendanceRecords.reduce((sum, a) => sum + (a.totalBreakMinutes || 0), 0),
+    totalPresent: presentRecords.length,
+    totalAbsent: attendanceRecords.length - presentRecords.length,
+    totalWorkHours: Math.round((totalWorkMinutes / 60) * 10) / 10,
+    totalBreakMinutes: attendanceRecords.reduce((sum, a) => sum + (a.totalBreakMinutes || 0), 0),
     averageWorkHours:
-      attendanceRecords.length > 0
-        ? attendanceRecords.reduce((sum, a) => sum + (a.totalHours || 0), 0) /
-          attendanceRecords.length
+      presentRecords.length > 0
+        ? Math.round((totalWorkMinutes / presentRecords.length / 60) * 10) / 10
+        : 0,
+    averageBreakMinutes:
+      presentRecords.length > 0
+        ? Math.round(attendanceRecords.reduce((sum, a) => sum + (a.totalBreakMinutes || 0), 0) / presentRecords.length)
         : 0,
   };
 
@@ -159,30 +165,33 @@ export const getTaskReport = async (organizationId, options = {}) => {
     if (endDate) query.createdAt.$lte = new Date(endDate);
   }
 
-  if (userId) query.assignedTo = userId;
+  if (userId) query.userId = userId;
   if (teamId) query.teamId = teamId;
   if (status) query.status = status;
 
   const taskRecords = await Task.find(query)
-    .populate("assignedTo", "firstName lastName email")
+    .populate("userId", "firstName lastName email")
     .populate("createdBy", "firstName lastName")
     .sort({ createdAt: -1 })
     .lean();
 
   // Calculate statistics
+  const completedCount = taskRecords.filter((t) => t.status === "completed").length;
   const stats = {
     totalTasks: taskRecords.length,
     todo: taskRecords.filter((t) => t.status === "todo").length,
     inProgress: taskRecords.filter((t) => t.status === "in_progress").length,
     review: taskRecords.filter((t) => t.status === "review").length,
-    completed: taskRecords.filter((t) => t.status === "completed").length,
+    completed: completedCount,
+    completedTasks: completedCount,
     cancelled: taskRecords.filter((t) => t.status === "cancelled").length,
     overdue: taskRecords.filter(
       (t) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "completed"
     ).length,
+    completionRate: taskRecords.length > 0 ? Math.round((completedCount / taskRecords.length) * 100) : 0,
     averageProgress:
       taskRecords.length > 0
-        ? taskRecords.reduce((sum, t) => sum + (t.progress || 0), 0) / taskRecords.length
+        ? Math.round(taskRecords.reduce((sum, t) => sum + (t.progress || 0), 0) / taskRecords.length)
         : 0,
   };
 
