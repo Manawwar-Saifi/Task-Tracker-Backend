@@ -92,6 +92,10 @@ app.get("/health", (req, res) => {
 
 /* -------------------- API ROUTES -------------------- */
 
+app.get("/", (req, res) => {
+  res.json({ success: true, message: "WorkTrack API", version: "1.0", docs: "/api/v1/health" });
+});
+
 app.use("/api/v1", routes);
 
 /* -------------------- 404 HANDLER -------------------- */
